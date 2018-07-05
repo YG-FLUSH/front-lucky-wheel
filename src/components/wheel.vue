@@ -38,32 +38,79 @@
 
 <script>
 import NebPay from 'nebpay'
+import 'nebulas'
+import Neb from 'nebulas'
 
+if(!NebPay){
+    alert("请按装星云链钱包")
+}
 var nebPay = new NebPay();
 var serialNumber = "";
-var enableDebug = true;
+var enableDebug = false;
+var neb = new Neb.Neb();
+var test_url = "http://localhost:8685"
+neb.setRequest(new Neb.HttpRequest(test_url));
 function onPayClick () {
-    var to = 'n1VzbMJ5mGMHRtG5apozSKunqxaKT88PNgJ';
+    var dappAddress = "n1vc4kuPJ8DFnkUL8seyRN5zEjbdJbGj76p";
     var value = 0.01;
-    serialNumber = nebPay.pay(to, value, {
-        qrcode: {
-            showQRCode: false
-        },
-        goods: {
-            name: 'luck wheel lottery',
-            desc: 'run wheel'
-        },
-        listener: function(resp) {
-            console.log("resp: " + JSON.stringify(resp));
-            var i = 0;
-            setInterval(()=>{
-                console.log("resp timeout:  " + JSON.stringify(resp));
-                i += 1;
-                onrefreshClick(i);
-                }, 1000);
-        },
-        debug: enableDebug,
-    });
+    var from = Neb.Account.NewAccount().getAddressString();
+    var from = "n1FF1nz6tarkDVwWQkMnnwFPuPKUaQTdptE";
+    var gas_price = "1000000"
+    var gas_limit = "2000000"
+    var contract = {
+        "function": "getWheelId",
+        "args": ""
+    }
+    neb.api.call(from, dappAddress, 0, "0", gas_price, gas_limit, contract).then(function (resp) {
+        var result = JSON.parse(resp.result);
+        var wheelId = result['wheelId'];
+        var callArgs = JSON.stringify([wheelId]);
+        console.log('args', callArgs);
+
+        nebPay.call(dappAddress, value, "lottery", callArgs, {
+            qrcode: {
+                showQRCode: false
+            },
+            listener: function(resp) {
+                var contract = {
+                    "function": "queryResult",
+                    "args": JSON.stringify([wheelId])
+                }
+                var t1 = setInterval(function(){
+                    neb.api.call(from, dappAddress, 0, "0", gas_price, gas_limit, contract).then(function (resp) {
+                        console.log('resp', resp);
+                        var result = JSON.parse(resp.result);
+                        if(!result){
+                            return 
+                        }
+                        window.clearInterval(t1);
+                        result['award'] = _weitonas(result['award']);
+                        var position = result['position'];
+                        var rotate = 3600 * i + position / awards.length * 360;
+                        console.log('rotate', rotate);
+                        runEl.style['transition'] = "transform 3s ease";
+                        runEl.style['-webkit-transition'] = "transform 3s ease";
+                        runEl.style['transform'] = "rotate(" + rotate +"deg)";
+                        runEl.style['-webkit-transform'] = "rotate(" + rotate +"deg)";
+                        if(result['award'] !== 0){
+                            setTimeout(function(){
+                                alert("恭喜获得" + result['award']+"nas");
+                            }, 4000);
+                        }
+                    }).catch(function (err) {
+                        console.log("error:" + err.message);
+                    })
+                }, 10000);
+            }
+        });
+
+    }).catch(function (err) {
+        console.log("error:" + err.message);
+    })
+}
+
+function _weitonas(wei){
+    return wei / Math.pow(10, 18);
 }
 
 function onrefreshClick(i) {
@@ -72,8 +119,12 @@ function onrefreshClick(i) {
         console.log(resp);
         var runEl = document.querySelector('.gb-wheel-run');
         runEl.style['transform'] = 'rotate(' + (360*3*i)+'deg)';
-        runEl.style['-webkit-transition'] = "-webkit-transform 1.5s linear";
-        runEl.style['transition'] = "transform 1.5s linear";
+        runEl.style['-webkit-transition'] = "-webkit-transform 6s linear";
+        runEl.style['transition'] = "transform 6s linear";
+        if(resp.data){
+            resp.data.value;
+            resp.data.position;
+        }
         console.log(runEl.style['transform']);
     })
     .catch(function (err) {
@@ -81,25 +132,34 @@ function onrefreshClick(i) {
     });
 }
 
+function positionToDeg(position){
+    return position / awards.length * 360
+}
+
 function genAwardsRotate (awards) {
     awards.forEach(function (v, i, a) {
-        var r = (2 * i) / 12
+        var r = (2 * i) / (awards.length *2)
         v['rotate'] = 'rotate(' + r + 'turn)'
     })
 }
 function genLineRotate (awards) {
     awards.forEach(function (v, i, a) {
-        var r = (2 * i + 1) / 12
+        var r = (2 * i + 1) / (awards.length *2)
         v['line_rotate'] = 'rotate(' + r + 'turn)'
     })
 }
+
 var awards = [
-    {'id': 0, 'name': '耳机', 'icon': 'icono-headphone'},
-    {'id': 1, 'name': 'iPhone', 'icon': 'icono-iphone'},
-    {'id': 2, 'name': '相机', 'icon': 'icono-camera'},
-    {'id': 3, 'name': '咖啡杯', 'icon': 'icono-cup'},
-    {'id': 4, 'name': '日历', 'icon': 'icono-calendar'},
-    {'id': 5, 'name': '键盘', 'icon': 'icono-keyboard'}
+    {'id': 0, 'name': '0.05', 'icon': 'icono-headphone'},
+    {'id': 1, 'name': '0', 'icon': 'icono-iphone'},
+    {'id': 2, 'name': '0.01', 'icon': 'icono-camera'},
+    {'id': 3, 'name': '0', 'icon': 'icono-cup'},
+    {'id': 4, 'name': '0.01', 'icon': 'icono-calendar'},
+    {'id': 5, 'name': '0', 'icon': 'icono-keyboard'},
+    {'id': 6, 'name': '0.02', 'icon': 'icono-keyboard'},
+    {'id': 7, 'name': '0', 'icon': 'icono-keyboard'},
+    {'id': 8, 'name': '0.01', 'icon': 'icono-keyboard'},
+    {'id': 9, 'name': '0', 'icon': 'icono-keyboard'}
 ]
 genAwardsRotate(awards)
 genLineRotate(awards)
